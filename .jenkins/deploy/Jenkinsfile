@@ -1,0 +1,138 @@
+pipeline {
+    agent none
+    environment {
+        GHCR_REGISTRY = 'ghcr.io' // GitHub Container Registry
+        GHCR_USER = 'ASDFASDF' // This can technically be anything. The GitHub PAT is what actually authenticates to GHCR.
+        GHCR_CREDENTIALS_ID = 'github-packages-classic-token-string' // Jenkins Credentials ID for a GitHub PAT Token with read/write access to GHCR packages
+    }
+    stages {
+        stage('Dump env using a sh command') {
+            agent any
+            steps {
+                sh 'env'
+            }
+        }
+        stage('Check Jenkins Environment') {
+            steps {
+                script {
+                    // Check if the environment is "production"
+                    if ("${env.WEBFX_INTERACTIVE_JENKINS_ENVIRONMENT}" != "production") {
+                        // Print a message and exit if not in production
+                        echo "This build only runs in the 'production' environment. Current environment: ${env.WEBFX_INTERACTIVE_JENKINS_ENVIRONMENT}"
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Exiting pipeline with 'NOT_BUILT' status as it's not running in the production environment.")
+                    }
+                }
+            }
+        }
+        // Also, check out this way to detect if you are building a tag or not: https://www.youtube.com/watch?v=saiCjlJpfdA
+        stage('Exit early if not buildingTag()') {
+            when {
+                not { buildingTag() }
+            }
+            agent any
+            steps {
+                script {
+                    echo "Not building a tag. Exiting pipeline with 'NOT_BUILT' status."
+                    currentBuild.result = 'NOT_BUILT'
+                    error("Not building a tag. Exiting pipeline with 'NOT_BUILT' status.")
+                }
+            }
+        }
+        stage('Define vars') {
+            agent any
+            steps {
+                script {
+                    def gitUrl = env.GIT_URL
+                    def matcher = gitUrl =~ /https:\/\/github\.com\/([^\/]+)\/([^\/]+)\.git/
+                    if (matcher.matches()) {
+                        env.GITHUB_REPOSITORY_OWNER = matcher[0][1]
+                        env.GITHUB_REPOSITORY_NAME = matcher[0][2]
+                        echo "Owner: ${env.GITHUB_REPOSITORY_OWNER}, Repo: ${env.GITHUB_REPOSITORY_NAME}"
+                    } else {
+                        error "Failed to extract owner and repo from GIT_URL"
+                    }
+                    // Use the Git ref name for the image name
+                    env.GHCR_REPOSITORY = "${env.GITHUB_REPOSITORY_OWNER.toLowerCase()}/${env.GITHUB_REPOSITORY_NAME.toLowerCase()}"
+                }
+            }
+        }
+        stage('Build and Push Images') {
+            parallel {
+                stage('Build for amd64') {
+                    agent { label 'docker && amd64' }
+                    steps {
+                        script {
+                            withCredentials([string(credentialsId: GHCR_CREDENTIALS_ID,
+                                                             variable: 'GHCR_PAT')]) {
+                                sh '''
+                                echo $GHCR_PAT | wc -m
+                                echo "${GHCR_PAT}" | docker login "${GHCR_REGISTRY}" -u "${GHCR_USER}" --password-stdin
+
+                                # docker buildx create --use --name multiarch-builder || true
+                                # docker buildx inspect multiarch-builder --bootstrap
+                                # docker buildx build --platform linux/amd64 \
+                                #    -t ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64 \
+                                #    --push .
+                                # Use docker build instead of docker buildx
+                                docker build -t ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64 .
+                                docker push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64
+                                '''
+                            }
+                        }
+                    }
+                }
+                stage('Build for arm64') {
+                    agent { label 'docker && arm64' }
+                    steps {
+                        script {
+                            withCredentials([string(credentialsId: GHCR_CREDENTIALS_ID,
+                                                             variable: 'GHCR_PAT')]) {
+                                sh '''
+                                echo $GHCR_PAT | wc -m
+                                echo "${GHCR_PAT}" | docker login "${GHCR_REGISTRY}" -u "${GHCR_USER}" --password-stdin
+
+                                # docker buildx create --use --name multiarch-builder || true
+                                # docker buildx inspect multiarch-builder --bootstrap
+                                # docker buildx build --platform linux/arm64 \
+                                #    -t ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64 \
+                                #    --push .
+                                # Use docker build instead of docker buildx
+                                docker build -t ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64 .
+                                docker push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Create and Push Manifest') {
+            agent { label 'docker' } // Or use any node with Docker CLI
+            steps {
+                script {
+                    withCredentials([string(credentialsId: GHCR_CREDENTIALS_ID,
+                                                        variable: 'GHCR_PAT')]) {
+                        sh '''
+                        echo "${GHCR_PAT}" | docker login ${GHCR_REGISTRY} -u "${GHCR_USER}" --password-stdin
+
+                        docker manifest rm ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME} || true
+
+                        docker manifest create ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME} \
+                            ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64 \
+                            ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64 --amend
+
+                        docker manifest annotate ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME} \
+                            ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64 --os linux --arch amd64
+
+                        docker manifest annotate ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME} \
+                            ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64 --os linux --arch arm64
+
+                        docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME} --purge
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
