@@ -1,5 +1,9 @@
 FROM ubuntu:jammy
 
+ARG OWNER=WebpageFX
+ARG REPO=vscode-server-install
+LABEL org.opencontainers.image.source=https://github.com/${OWNER}/${REPO}
+
 # https://github.com/microsoft/vscode/releases
 
 # v1.95.3
