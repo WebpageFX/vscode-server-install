@@ -1,6 +1,6 @@
 FROM ubuntu:jammy
 
-ARG OWNER=WebpageFX
+ARG OWNER=webpagefx
 ARG REPO=vscode-server-install
 LABEL org.opencontainers.image.source=https://github.com/${OWNER}/${REPO}
 
