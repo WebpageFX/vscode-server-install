@@ -20,13 +20,3 @@ RUN apt update && apt install -y curl
 RUN mkdir -p ~/.vscode-server/cli/servers/Stable-${VSCODE_SERVER_COMMIT}/server && \
     curl -fsSL https://update.code.visualstudio.com/commit:${VSCODE_SERVER_COMMIT}/server-linux-x64/stable | \
     tar -xz -C ~/.vscode-server/cli/servers/Stable-${VSCODE_SERVER_COMMIT}/server
-
-# Create Cursor server directories
-RUN mkdir -p ~/.cursor-server/bin/${VSCODE_SERVER_COMMIT} && \
-    mkdir -p ~/.cursor-server/data/Machine
-
-# Set correct ownership and permissions
-RUN chown -R root:root ~/.vscode-server && \
-    chown -R root:root ~/.cursor-server && \
-    chmod -R 755 ~/.vscode-server && \
-    chmod -R 755 ~/.cursor-server
