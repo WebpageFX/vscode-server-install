@@ -1,8 +1,4 @@
-FROM ubuntu:jammy
-
-ARG OWNER=webpagefx
-ARG REPO=vscode-server-install
-LABEL org.opencontainers.image.source=https://github.com/${OWNER}/${REPO}
+FROM alpine:latest
 
 # https://github.com/microsoft/vscode/releases
 
@@ -14,7 +10,8 @@ ARG VSCODE_SERVER_COMMIT=138f619c86f1199955d53b4166bef66ef252935c
 
 # ..etc
 
-RUN apt update && apt install -y curl
+# Install required dependencies
+RUN apk add --no-cache curl tar
 
 # Download and extract VS Code server in one step, avoiding temporary file
 RUN mkdir -p ~/.vscode-server/cli/servers/Stable-${VSCODE_SERVER_COMMIT}/server && \
