@@ -4,7 +4,6 @@ pipeline {
         GHCR_REGISTRY = 'ghcr.io' // GitHub Container Registry
         GHCR_USER = 'ASDFASDF' // This can technically be anything. The GitHub PAT is what actually authenticates to GHCR.
         GHCR_CREDENTIALS_ID = 'github-packages-classic-token-string' // Jenkins Credentials ID for a GitHub PAT Token with read/write access to GHCR packages
-        VSCODE_SERVER_COMMIT = '138f619c86f1199955d53b4166bef66ef252935c'
     }
     stages {
         stage('Dump env using a sh command') {
@@ -55,6 +54,23 @@ pipeline {
                     }
                     // Use the Git ref name for the image name
                     env.GHCR_REPOSITORY = "${env.GITHUB_REPOSITORY_OWNER.toLowerCase()}/${env.GITHUB_REPOSITORY_NAME.toLowerCase()}"
+                }
+            }
+        }
+        stage('Get VSCode Server Version') {
+            agent any
+            steps {
+                script {
+                    // Fetch the latest stable version's commit SHA
+                    def response = sh(
+                        script: '''
+                            curl -s https://update.code.visualstudio.com/api/commits/stable/server-linux-x64 | grep -o '"commit":"[^"]*"' | cut -d'"' -f4
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.VSCODE_SERVER_COMMIT = response
+                    echo "Using VSCode Server Commit: ${env.VSCODE_SERVER_COMMIT}"
                 }
             }
         }
