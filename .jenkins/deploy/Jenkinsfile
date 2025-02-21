@@ -4,6 +4,7 @@ pipeline {
         GHCR_REGISTRY = 'ghcr.io' // GitHub Container Registry
         GHCR_USER = 'ASDFASDF' // This can technically be anything. The GitHub PAT is what actually authenticates to GHCR.
         GHCR_CREDENTIALS_ID = 'github-packages-classic-token-string' // Jenkins Credentials ID for a GitHub PAT Token with read/write access to GHCR packages
+        VSCODE_SERVER_COMMIT = '138f619c86f1199955d53b4166bef66ef252935c'
     }
     stages {
         stage('Dump env using a sh command') {
@@ -71,6 +72,8 @@ pipeline {
 
                                 docker build \
                                     --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY_NAME}" \
+                                    --build-arg ARCH=amd64 \
+                                    --build-arg VSCODE_SERVER_COMMIT=${VSCODE_SERVER_COMMIT} \
                                     -t ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64 .
                                 docker push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-amd64
                                 '''
@@ -90,6 +93,8 @@ pipeline {
 
                                 docker build \
                                     --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY_NAME}" \
+                                    --build-arg ARCH=arm64 \
+                                    --build-arg VSCODE_SERVER_COMMIT=${VSCODE_SERVER_COMMIT} \
                                     -t ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64 .
                                 docker push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${TAG_NAME}-arm64
                                 '''
