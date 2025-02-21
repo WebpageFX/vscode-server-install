@@ -61,10 +61,18 @@ pipeline {
             agent any
             steps {
                 script {
-                    // Fetch the latest stable version's commit SHA
+                    // Get the latest release tag and its commit SHA
                     def response = sh(
                         script: '''
-                            curl -s https://update.code.visualstudio.com/api/commits/stable/server-linux-x64 | grep -o '"commit":"[^"]*"' | cut -d'"' -f4
+                            # First get the latest release tag
+                            TAG=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+                                https://api.github.com/repos/microsoft/vscode/releases/latest | \
+                                jq -r '.tag_name')
+                            
+                            # Then get the commit SHA for this tag
+                            curl -s -H "Accept: application/vnd.github.v3+json" \
+                                https://api.github.com/repos/microsoft/vscode/git/refs/tags/${TAG} | \
+                                jq -r '.object.sha'
                         ''',
                         returnStdout: true
                     ).trim()
