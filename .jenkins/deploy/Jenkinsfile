@@ -5,6 +5,9 @@ pipeline {
         GHCR_USER = 'ASDFASDF' // This can technically be anything. The GitHub PAT is what actually authenticates to GHCR.
         GHCR_CREDENTIALS_ID = 'github-packages-classic-token-string' // Jenkins Credentials ID for a GitHub PAT Token with read/write access to GHCR packages
     }
+    triggers {
+        cron('0 0 * * *') // Runs at midnight every day
+    }
     stages {
         stage('Dump env using a sh command') {
             agent any
@@ -36,6 +39,19 @@ pipeline {
                     echo "Not building a tag. Exiting pipeline with 'NOT_BUILT' status."
                     currentBuild.result = 'NOT_BUILT'
                     error("Not building a tag. Exiting pipeline with 'NOT_BUILT' status.")
+                }
+            }
+        }
+        stage('Check if scheduled build is for v1') {
+            agent any
+            steps {
+                script {
+                    def isScheduledBuild = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
+                    if (isScheduledBuild && env.TAG_NAME != 'v1') {
+                        echo "Scheduled builds only run for 'v1' tag. Current tag: ${env.TAG_NAME}"
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Exiting pipeline: scheduled builds only run for 'v1' tag.")
+                    }
                 }
             }
         }
