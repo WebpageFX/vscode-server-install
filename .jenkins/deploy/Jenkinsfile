@@ -176,41 +176,65 @@ pipeline {
                         
                         // Push first manifest with retry
                         echo "Pushing first manifest: ${DYNAMIC_TAG_1}"
-                        retry(3) {
-                            timeout(time: 2, unit: 'MINUTES') {
+                        retry(10) {
+                            // Add sleep for backoff between attempts
+                            sleep(time: 10, unit: 'SECONDS')
+                            timeout(time: 60, unit: 'MINUTES') {
                                 sh '''
+                                # Set Docker timeout environment variables
+                                export DOCKER_CLIENT_TIMEOUT=300
+                                export COMPOSE_HTTP_TIMEOUT=300
+                                
                                 # Create and push manifest for DYNAMIC_TAG_1
+                                echo "Removing any existing manifest..."
                                 docker manifest rm ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} || true
+
+                                echo "Creating manifest..."
                                 docker manifest create ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1}-amd64 \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1}-arm64 --amend
+
+                                echo "Annotating manifest..."
                                 docker manifest annotate ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1}-amd64 --os linux --arch amd64
                                 docker manifest annotate ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1}-arm64 --os linux --arch arm64
+
+                                echo "Pushing manifest..."
                                 docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} --purge
+                                echo "First manifest push completed successfully"
                                 '''
                             }
                         }
                         
-                        // Push second manifest with separate retry and longer timeout
                         echo "Pushing second manifest: ${DYNAMIC_TAG_2}"
-                        retry(5) {
+                        retry(10) {
                             // Add sleep for backoff between attempts
                             sleep(time: 10, unit: 'SECONDS')
-                            
-                            timeout(time: 3, unit: 'MINUTES') {
+                            timeout(time: 60, unit: 'MINUTES') {
                                 sh '''
+                                # Set Docker timeout environment variables
+                                export DOCKER_CLIENT_TIMEOUT=300
+                                export COMPOSE_HTTP_TIMEOUT=300
+                                
                                 # Create and push manifest for DYNAMIC_TAG_2
+                                echo "Removing any existing manifest..."
                                 docker manifest rm ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} || true
+
+                                echo "Creating manifest..."
                                 docker manifest create ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2}-amd64 \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2}-arm64 --amend
+
+                                echo "Annotating manifest..."
                                 docker manifest annotate ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2}-amd64 --os linux --arch amd64
                                 docker manifest annotate ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} \
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2}-arm64 --os linux --arch arm64
+
+                                echo "Pushing manifest..."
                                 docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} --purge
+                                echo "Second manifest push completed successfully"
                                 '''
                             }
                         }
