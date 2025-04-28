@@ -171,15 +171,20 @@ pipeline {
                 script {
                     withCredentials([string(credentialsId: GHCR_CREDENTIALS_ID,
                                                         variable: 'GHCR_PAT')]) {
-                        // Login to GitHub Container Registry
-                        sh 'echo "${GHCR_PAT}" | docker login ${GHCR_REGISTRY} -u "${GHCR_USER}" --password-stdin'
+                        // Login to GitHub Container Registry with retry
+                        retry(5) {
+                            sleep(time: 5, unit: 'SECONDS')
+                            timeout(time: 3, unit: 'MINUTES') {
+                                sh 'echo "${GHCR_PAT}" | docker login ${GHCR_REGISTRY} -u "${GHCR_USER}" --password-stdin'
+                            }
+                        }
                         
                         // Push first manifest with retry
                         echo "Pushing first manifest: ${DYNAMIC_TAG_1}"
                         retry(10) {
                             // Add sleep for backoff between attempts
                             sleep(time: 10, unit: 'SECONDS')
-                            timeout(time: 60, unit: 'MINUTES') {
+                            timeout(time: 30, unit: 'MINUTES') {
                                 sh '''
                                 # Set Docker timeout environment variables
                                 export DOCKER_CLIENT_TIMEOUT=300
@@ -201,8 +206,17 @@ pipeline {
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1}-arm64 --os linux --arch arm64
 
                                 echo "Pushing manifest..."
-                                docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} --purge
-                                echo "First manifest push completed successfully"
+                                # Add retry for just the manifest push command
+                                for i in {1..5}; do
+                                  echo "Push attempt $i for ${DYNAMIC_TAG_1}..."
+                                  if docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_1} --purge; then
+                                    echo "First manifest push completed successfully"
+                                    break
+                                  else
+                                    echo "Push attempt $i failed, retrying in 10 seconds..."
+                                    sleep 10
+                                  fi
+                                done
                                 '''
                             }
                         }
@@ -211,7 +225,7 @@ pipeline {
                         retry(10) {
                             // Add sleep for backoff between attempts
                             sleep(time: 10, unit: 'SECONDS')
-                            timeout(time: 60, unit: 'MINUTES') {
+                            timeout(time: 30, unit: 'MINUTES') {
                                 sh '''
                                 # Set Docker timeout environment variables
                                 export DOCKER_CLIENT_TIMEOUT=300
@@ -233,8 +247,17 @@ pipeline {
                                 ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2}-arm64 --os linux --arch arm64
 
                                 echo "Pushing manifest..."
-                                docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} --purge
-                                echo "Second manifest push completed successfully"
+                                # Add retry for just the manifest push command
+                                for i in {1..5}; do
+                                  echo "Push attempt $i for ${DYNAMIC_TAG_2}..."
+                                  if docker manifest push ${GHCR_REGISTRY}/${GHCR_REPOSITORY}:${DYNAMIC_TAG_2} --purge; then
+                                    echo "Second manifest push completed successfully"
+                                    break
+                                  else
+                                    echo "Push attempt $i failed, retrying in 10 seconds..."
+                                    sleep 10
+                                  fi
+                                done
                                 '''
                             }
                         }
